@@ -44,6 +44,8 @@ video_context = videointelligence.VideoContext(
  
 def analyze_video(event, context):
     print(event)
+    print("processing desactivated")
+    return
  
     input_uri = "gs://" + event["bucket"] + "/" + event["name"]
     file_stem = event["name"].split(".")[0]

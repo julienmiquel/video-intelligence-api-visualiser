@@ -1,1 +1,6 @@
 google-cloud-videointelligence
+google-cloud-speech
+google-cloud-storage
+librosa
+jiwer
+protobuf

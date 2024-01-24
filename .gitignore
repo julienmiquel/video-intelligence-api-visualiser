@@ -1,0 +1,1 @@
+gcloud components install alpha beta skaffold minikube kubectl gke-gcloud-auth-plugin

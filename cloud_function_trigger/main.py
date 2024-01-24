@@ -39,11 +39,21 @@ from google.cloud.speech_v2.types import cloud_speech
 from google.api_core.client_options import ClientOptions
 from google.cloud import speech_v2
 
-client = SpeechClient(    client_options=ClientOptions(api_endpoint=f"{REGION}-speech.googleapis.com"))
+from google.cloud.speech_v2 import SpeechClient
+from google.cloud.speech_v2.types import cloud_speech
+from google.api_core.client_options import ClientOptions
+from google.cloud import speech_v2
+
+def get_sttClient():
+    
+    client = SpeechClient(    client_options=ClientOptions(api_endpoint=f"{REGION}-speech.googleapis.com"))
+    return client
+
 
 def get_recognizer(recognizer_id: str, language_code : str):
 
     try:
+        client = get_sttClient()
         # Initialize request argument(s)
         request = speech_v2.GetRecognizerRequest(        name=recognizer_id,        )
         recognizer = client.get_recognizer(request)

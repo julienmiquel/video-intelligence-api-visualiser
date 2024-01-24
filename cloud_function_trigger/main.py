@@ -33,7 +33,46 @@ def write_to_bucket(bucket_name, file_name, input):
     return blob.name
 
 
-def transcribe_gcs(gcs_uri: str, gcs_uri_output: str, language_code) -> str:
+#############################
+from google.cloud.speech_v2 import SpeechClient
+from google.cloud.speech_v2.types import cloud_speech
+from google.api_core.client_options import ClientOptions
+from google.cloud import speech_v2
+
+client = SpeechClient(    client_options=ClientOptions(api_endpoint=f"{REGION}-speech.googleapis.com"))
+
+def get_recognizer(recognizer_id: str, language_code : str):
+
+    try:
+        # Initialize request argument(s)
+        request = speech_v2.GetRecognizerRequest(        name=recognizer_id,        )
+        recognizer = client.get_recognizer(request)
+        # Handle the response
+        print(recognizer)
+        return recognizer
+    except Exception as e:
+        print(e)
+        print("Error getting recognizer. Create new one.")
+
+    recognizer_request = cloud_speech.CreateRecognizerRequest(
+        parent=f"projects/{PROJECT_ID}/locations/{REGION}",
+        recognizer_id=recognizer_id,
+        recognizer=cloud_speech.Recognizer(
+            language_codes=[language_code],
+            model="chirp",
+        ),
+    )
+    client.get_recognizer(recognizer_id)
+    create_operation = client.create_recognizer(request=recognizer_request)
+    recognizer = create_operation.result()
+
+    return recognizer
+
+
+
+
+
+def transcribe_gcs(gcs_uri_input: str, gcs_uri_output: str, language_code) -> str:
     """Asynchronously transcribes the audio file specified by the gcs_uri.
 
     Args:
@@ -42,36 +81,34 @@ def transcribe_gcs(gcs_uri: str, gcs_uri_output: str, language_code) -> str:
     Returns:
         The generated transcript from the audio file provided.
     """
-    from google.cloud import speech
+    from google.cloud.speech_v2 import SpeechClient
+    from google.cloud.speech_v2.types import cloud_speech
+    from google.api_core.client_options import ClientOptions
 
-    client = speech.SpeechClient()
+    client = SpeechClient(    client_options=ClientOptions(api_endpoint=f"{REGION}-speech.googleapis.com"))
 
-    audio = speech.RecognitionAudio(uri=gcs_uri)
-    config = speech.RecognitionConfig(
-        encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
-        sample_rate_hertz=44100,
-        language_code=language_code,
+    recognizer_id = f"chirp-{language_code.lower()}-test"
+    recognizer = get_recognizer(recognizer_id, language_code    )
+
+    print(f"Created recognizer: {recognizer.name}")
+
+    long_audio_config = cloud_speech.RecognitionConfig(
+        features=cloud_speech.RecognitionFeatures(
+            enable_automatic_punctuation=True, enable_word_time_offsets=True
+        ),
+        auto_decoding_config={},
     )
 
-    operation = client.long_running_recognize(config=config, audio=audio)
+    long_audio_request = cloud_speech.BatchRecognizeRequest(
+        recognizer=recognizer.name,
+        recognition_output_config={
+            "gcs_output_config": {"uri": f"{gcs_uri_output}/transcriptions"}
+        },
+        files=[{"config": long_audio_config, "uri": gcs_uri_input}],
+    )
 
-    print("Waiting for operation to complete...")
-    response = operation.result(timeout=90)
-
-    transcript_builder = []
-    # Each result is for a consecutive portion of the audio. Iterate through
-    # them to get the transcripts for the entire audio file.
-    for result in response.results:
-        # The first alternative is the most likely one for this portion.
-        transcript_builder.append(
-            f"\nTranscript: {result.alternatives[0].transcript}")
-        transcript_builder.append(
-            f"\nConfidence: {result.alternatives[0].confidence}")
-
-    transcript = "".join(transcript_builder)
-    print(transcript)
-    write_to_bucket(OUTPUT_BUCKET, gcs_uri_output, transcript)
-    return transcript
+    long_audio_operation = client.batch_recognize(request=long_audio_request)
+    return 
 
 
 def process_video(input_uri, output_uri, language_code):
@@ -189,7 +226,8 @@ def analyze_video(event, context):
     if "hi-IN" in input_uri:
         language_code = "hi-IN"
 
-    print("processing desactivated")
+    transcribe_gcs(input_uri, output_uri, language_code)
+    #print("processing desactivated")
 #    return
     # process_video(input_uri, output_uri, language_code)
     # process_stt()
